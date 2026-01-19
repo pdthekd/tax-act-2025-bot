@@ -120,7 +120,7 @@ if prompt := st.chat_input("Ask about Section 45, TDS rates, or old vs new provi
         try:
             # Configure Model with the uploaded files + System Instructions
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro",
+                model_name="gemini-2.5-pro",
                 system_instruction=SYSTEM_INSTRUCTION
             )
             
