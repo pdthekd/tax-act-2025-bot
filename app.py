@@ -54,7 +54,7 @@ def upload_knowledge_base():
     file_names = [
         "Income_Tax_Act_2025_Final.pdf",
         "ICAI_Tabular_Mapping_2025.pdf",
-        "Memorandum_of_Suggestions_2025-part-1.pdf",
+        #"Memorandum_of_Suggestions_2025-part-1.pdf",
         #"Memorandum_of_Suggestions_2025-part-2.pdf",
         #"Memorandum_of_Suggestions_2025-part-3.pdf",
         #"Memorandum_of_Suggestions_2025-part-4.pdf",
@@ -120,7 +120,7 @@ if prompt := st.chat_input("Ask about Section 45, TDS rates, or old vs new provi
         try:
             # Configure Model with the uploaded files + System Instructions
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
+                model_name="gemini-2.5-pro",
                 system_instruction=SYSTEM_INSTRUCTION
             )
             
