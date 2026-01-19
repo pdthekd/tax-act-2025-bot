@@ -53,7 +53,7 @@ def upload_knowledge_base():
     """
     file_names = [
         "Income_Tax_Act_2025_Final.pdf",
-        "ICAI_Tabular_Mapping_2025.pdf",
+        #"ICAI_Tabular_Mapping_2025.pdf",
         #"Memorandum_of_Suggestions_2025-part-1.pdf",
         #"Memorandum_of_Suggestions_2025-part-2.pdf",
         #"Memorandum_of_Suggestions_2025-part-3.pdf",
