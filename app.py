@@ -55,12 +55,12 @@ def upload_knowledge_base():
         "Income_Tax_Act_2025_Final.pdf",
         "ICAI_Tabular_Mapping_2025.pdf",
         "Memorandum_of_Suggestions_2025-part-1.pdf",
-        "Memorandum_of_Suggestions_2025-part-2.pdf",
-        "Memorandum_of_Suggestions_2025-part-3.pdf",
-        "Memorandum_of_Suggestions_2025-part-4.pdf",
-        "ICAI_Suggestions_Review.pdf",
-        "ICAI's suggestions considered in the Income-tax Bill 2025 tabled in the Lok Sabha on 13.02.2025.pdf",
-        "ICAI's Suggestions considered in the Income-tax Act, 2025.pdf"
+        #"Memorandum_of_Suggestions_2025-part-2.pdf",
+        #"Memorandum_of_Suggestions_2025-part-3.pdf",
+        #"Memorandum_of_Suggestions_2025-part-4.pdf",
+        #"ICAI_Suggestions_Review.pdf",
+        #"ICAI's suggestions considered in the Income-tax Bill 2025 tabled in the Lok Sabha on 13.02.2025.pdf",
+        #"ICAI's Suggestions considered in the Income-tax Act, 2025.pdf"
     ]
     
     uploaded_files = []
@@ -120,7 +120,7 @@ if prompt := st.chat_input("Ask about Section 45, TDS rates, or old vs new provi
         try:
             # Configure Model with the uploaded files + System Instructions
             model = genai.GenerativeModel(
-                model_name="gemini-2.5-pro",
+                model_name="gemini-1.5-pro-002",
                 system_instruction=SYSTEM_INSTRUCTION
             )
             
