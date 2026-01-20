@@ -12,8 +12,7 @@ st.set_page_config(
 )
 
 # --- VISUAL TWEAKS (CSS) ---
-# FIX: Removed the "background-color" line that broke Dark Mode.
-# We only keep the spacing tweaks now.
+# Dark Mode Friendly: We removed the background-color rule.
 st.markdown("""
 <style>
     .stChatInput {
@@ -23,7 +22,7 @@ st.markdown("""
     }
     .block-container {
         padding-top: 2rem;
-        padding-bottom: 5rem; /* Space for the fixed chat input */
+        padding-bottom: 5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -50,92 +49,4 @@ OPERATIONAL INSTRUCTIONS:
 3. DEPTH: Do not summarize. List ALL conditions explicitly using bullet points.
 """
 
-# --- FILE CONFIGURATION ---
-@st.cache_resource
-def upload_knowledge_base():
-    # Loading ALL 9 files
-    file_names = [
-        "Income_Tax_Act_2025_Final.pdf",
-        "ICAI_Tabular_Mapping_2025.pdf",
-        "Memorandum_of_Suggestions_2025-part-1.pdf",
-        "Memorandum_of_Suggestions_2025-part-2.pdf",
-        "Memorandum_of_Suggestions_2025-part-3.pdf",
-        "Memorandum_of_Suggestions_2025-part-4.pdf",
-        "ICAI_Suggestions_Review.pdf",
-        "ICAI's suggestions considered in the Income-tax Bill 2025 tabled in the Lok Sabha on 13.02.2025.pdf",
-        "ICAI's Suggestions considered in the Income-tax Act, 2025.pdf"
-    ]
-    
-    uploaded_files = []
-    
-    # We use a placeholder to show loading status, then clear it
-    with st.sidebar:
-        status_placeholder = st.empty()
-        with status_placeholder.status("📚 Initializing Library...", expanded=True) as status:
-            for i, filename in enumerate(file_names):
-                status.write(f"Loading: {filename[:20]}...")
-                try:
-                    with open(filename, "rb") as f:
-                        myfile = client.files.upload(file=f, config={'display_name': filename})
-                    while myfile.state.name == "PROCESSING":
-                        time.sleep(1)
-                        myfile = client.files.get(name=myfile.name)
-                    uploaded_files.append(myfile)
-                except Exception as e:
-                    st.error(f"Error: {filename}")
-            status.update(label="✅ Ready", state="complete", expanded=False)
-        
-        # Once done, we remove the big status box
-        time.sleep(2)
-        status_placeholder.empty()
-        
-    return uploaded_files
-
-# --- SIDEBAR: "ACTIONS FIRST" DESIGN ---
-with st.sidebar:
-    st.title("⚖️ Tax Assistant")
-    st.caption("Gemini 2.5 Flash • Pro Edition")
-    st.divider()
-
-    # SECTION 1: HIGH VALUE ACTIONS (AT THE TOP)
-    st.subheader("📝 Session Actions")
-    
-    # Export Button (Prominent)
-    if "messages" in st.session_state:
-        chat_text = "TAX RESEARCH LOG\n================\n\n"
-        for msg in st.session_state.messages:
-            role = "USER" if msg["role"] == "user" else "ASSISTANT"
-            chat_text += f"[{role}]:\n{msg['content']}\n\n{'-'*40}\n\n"
-            
-        st.download_button(
-            label="📥 Download Research (.txt)",
-            data=chat_text,
-            file_name="tax_research_session.txt",
-            mime="text/plain",
-            type="primary" 
-        )
-    
-    # Clear Button
-    if st.button("🔄 Start New Chat", use_container_width=True):
-        st.session_state.messages = [{"role": "assistant", "content": "Conversation cleared. Ready for new queries."}]
-        st.rerun()
-
-    st.divider()
-
-    # SECTION 2: LOW VALUE INFO (COLLAPSED AT BOTTOM)
-    with st.expander("📂 View Source Documents (9)"):
-        st.caption(" The bot is currently reading these files:")
-        st.text("1. Income_Tax_Act_2025_Final.pdf")
-        st.text("2. ICAI_Tabular_Mapping_2025.pdf")
-        st.text("3. Memorandum_Part_1.pdf")
-        st.text("4. Memorandum_Part_2.pdf")
-        st.text("5. Memorandum_Part_3.pdf")
-        st.text("6. Memorandum_Part_4.pdf")
-        st.text("7. Suggestions_Review.pdf")
-        st.text("8. ICAI_Suggestions_Bill.pdf")
-        st.text("9. ICAI_Suggestions_Act.pdf")
-        st.success("✅ All Documents Active")
-
-# --- MAIN APP LOGIC ---
-
-# 1. Initialize DB (Happens silently now
+# --- FILE
