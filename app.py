@@ -13,7 +13,7 @@ st.set_page_config(
 
 # --- API SETUP (NEW SDK) ---
 try:
-    # The new SDK uses a Client object instead of global configuration
+    # Initialize the New GenAI Client
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
@@ -69,7 +69,6 @@ def upload_knowledge_base():
             status.write(f"Loading: {filename}...")
             try:
                 # 1. Upload using the new 'files.upload' method
-                # Note: We must read the file in binary mode for the new SDK
                 with open(filename, "rb") as f:
                     myfile = client.files.upload(file=f, config={'display_name': filename})
                 
@@ -119,8 +118,7 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
             time.sleep(0.3)
             
             try:
-                # B. Create Chat (New SDK Syntax)
-                # We create a chat session, passing the system instructions in the config
+                # B. Create Chat
                 chat = client.chats.create(
                     model="gemini-1.5-flash",
                     config=types.GenerateContentConfig(
@@ -128,7 +126,7 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                         temperature=0.3
                     ),
                     history=[
-                        # We must prime the history with the files
+                        # Prime the history with files
                         types.Content(
                             role="user",
                             parts=[
@@ -145,11 +143,12 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                     ]
                 )
 
-                # C. Stream Request
-                response_stream = chat.send_message(prompt, stream=True)
+                # C. Stream Request (THE FIX IS HERE)
+                # Old SDK: chat.send_message(prompt, stream=True)
+                # New SDK: chat.send_message_stream(prompt)
+                response_stream = chat.send_message_stream(prompt)
                 
-                # D. Parse & Display (New SDK returns clean text chunks directly)
-                # The new SDK's chunks are easier to handle
+                # D. Parse & Display
                 def stream_parser(stream):
                     for chunk in stream:
                         if chunk.text:
