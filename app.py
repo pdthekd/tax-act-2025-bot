@@ -86,7 +86,7 @@ def upload_knowledge_base():
 
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
-st.caption("Testing: Gemini 1.5 Flash-002 • Specific Version")
+st.caption("Testing: Gemini 2.5 Flash • Full Database")
 
 # 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
@@ -95,7 +95,7 @@ if "knowledge_base" not in st.session_state:
 # 2. Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "I am ready. I am using the specific '002' model version."}
+        {"role": "assistant", "content": "I am ready. Using the new Gemini 2.5 Flash model."}
     ]
 
 for msg in st.session_state.messages:
@@ -114,9 +114,10 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
             time.sleep(0.3)
             
             try:
-                # B. Create Chat with SPECIFIC MODEL VERSION
+                # B. Create Chat with YOUR SPECIFIC MODEL
+                # We found this in your diagnostic list: models/gemini-2.5-flash
                 chat = client.chats.create(
-                    model="gemini-1.5-flash-002",
+                    model="gemini-2.5-flash",
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
                         temperature=0.3
@@ -158,12 +159,3 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
             except Exception as e:
                 status.update(label="❌ Error", state="error")
                 st.error(f"Beta Test Failed: {e}")
-                
-                # --- DIAGNOSTIC: IF FAILED, LIST AVAILABLE MODELS ---
-                st.write("---")
-                st.warning("🔍 Running Diagnostic to see what models you DO have access to:")
-                try:
-                    for m in client.models.list():
-                        st.code(m.name)
-                except:
-                    st.error("Could not list models.")
