@@ -87,7 +87,7 @@ def stream_parser(stream):
 
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
-st.caption("Testing: Gemini 1.5 Flash • Streaming UI • Full Database")
+st.caption("Testing: Gemini 1.5 Flash-002 • Streaming UI • Full Database")
 
 # 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
@@ -118,10 +118,9 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
             time.sleep(0.3)
             
             try:
-                # B. Configure Model (Using Standard Flash)
-                # We use the generic tag "gemini-1.5-flash" to avoid version errors
+                # B. Configure Model (Using the Safe Production Flash)
                 model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash", 
+                    model_name="gemini-1.5-flash-002", 
                     system_instruction=SYSTEM_INSTRUCTION
                 )
                 
