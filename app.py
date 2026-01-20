@@ -83,4 +83,129 @@ def upload_knowledge_base():
                     uploaded_files.append(myfile)
                 except Exception as e:
                     st.error(f"Error: {filename}")
-            status.update(label="✅ Ready",
+            status.update(label="✅ Ready", state="complete", expanded=False)
+        
+        # Once done, we remove the big status box and just show a small indicator
+        time.sleep(2)
+        status_placeholder.empty()
+        
+    return uploaded_files
+
+# --- SIDEBAR: "ACTIONS FIRST" DESIGN ---
+with st.sidebar:
+    st.title("⚖️ Tax Assistant")
+    st.caption("Gemini 2.5 Flash • Pro Edition")
+    st.divider()
+
+    # SECTION 1: HIGH VALUE ACTIONS (AT THE TOP)
+    st.subheader("📝 Session Actions")
+    
+    # Export Button (Prominent)
+    if "messages" in st.session_state:
+        chat_text = "TAX RESEARCH LOG\n================\n\n"
+        for msg in st.session_state.messages:
+            role = "USER" if msg["role"] == "user" else "ASSISTANT"
+            chat_text += f"[{role}]:\n{msg['content']}\n\n{'-'*40}\n\n"
+            
+        st.download_button(
+            label="📥 Download Research (.txt)",
+            data=chat_text,
+            file_name="tax_research_session.txt",
+            mime="text/plain",
+            type="primary" # Makes the button stand out (filled color)
+        )
+    
+    # Clear Button
+    if st.button("🔄 Start New Chat", use_container_width=True):
+        st.session_state.messages = [{"role": "assistant", "content": "Conversation cleared. Ready for new queries."}]
+        st.rerun()
+
+    st.divider()
+
+    # SECTION 2: LOW VALUE INFO (COLLAPSED AT BOTTOM)
+    # We hide the file list in an expander so it doesn't clutter the view
+    with st.expander("📂 View Source Documents (9)"):
+        st.caption(" The bot is currently reading these files:")
+        st.text("1. Income_Tax_Act_2025_Final.pdf")
+        st.text("2. ICAI_Tabular_Mapping_2025.pdf")
+        st.text("3. Memorandum_Part_1.pdf")
+        st.text("4. Memorandum_Part_2.pdf")
+        st.text("5. Memorandum_Part_3.pdf")
+        st.text("6. Memorandum_Part_4.pdf")
+        st.text("7. Suggestions_Review.pdf")
+        st.text("8. ICAI_Suggestions_Bill.pdf")
+        st.text("9. ICAI_Suggestions_Act.pdf")
+        st.success("✅ All Documents Active")
+
+# --- MAIN APP LOGIC ---
+
+# 1. Initialize DB (Happens silently now)
+if "knowledge_base" not in st.session_state:
+    st.session_state.knowledge_base = upload_knowledge_base()
+
+# 2. Main Title
+st.title("Tax Act 2025 Research Assistant")
+st.markdown("Ask complex questions about sections, rates, and rationale.")
+
+# 3. Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "I am ready. Ask me about TDS, Capital Gains, or Section mappings."}]
+
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+# 4. Handle Input
+if prompt := st.chat_input("Ex: What are the conditions for Section 194C?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
+
+    with st.chat_message("assistant"):
+        start_time = time.time()
+        
+        # Status Bubble
+        with st.status("🔍 Analyzing Documents...", expanded=True) as status:
+            st.write("• Consulting Income Tax Act 2025...")
+            time.sleep(0.2)
+            
+            try:
+                chat = client.chats.create(
+                    model="gemini-2.5-flash",
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.3
+                    ),
+                    history=[
+                        types.Content(
+                            role="user",
+                            parts=[
+                                types.Part.from_uri(
+                                    file_uri=f.uri,
+                                    mime_type=f.mime_type
+                                ) for f in st.session_state.knowledge_base
+                            ] + [types.Part.from_text(text="System Ready.")]
+                        ),
+                        types.Content(
+                            role="model",
+                            parts=[types.Part.from_text(text="Understood.")]
+                        )
+                    ]
+                )
+
+                response_stream = chat.send_message_stream(prompt)
+                
+                def stream_parser(stream):
+                    for chunk in stream:
+                        if chunk.text:
+                            yield chunk.text
+
+                full_response = st.write_stream(stream_parser(response_stream))
+                
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                status.update(label=f"✅ Complete ({elapsed_time:.2f}s)", state="complete", expanded=False)
+                
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+            except Exception as e:
+                status.update(label="❌ Error", state="error")
+                st.error(f"Error: {e}")
