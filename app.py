@@ -3,27 +3,22 @@ import google.generativeai as genai
 import os
 import time
 
-# --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Tax Act 2025 (BETA)", page_icon="🧪")
+# --- PAGE CONFIGURATION (Kept as Beta) ---
+st.set_page_config(
+    page_title="Tax Act 2025 (BETA)",
+    page_icon="🧪",
+    layout="centered"
+)
 
 # --- API SETUP ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except Exception:
-    st.error("⚠️ API Key missing.")
+    st.error("⚠️ API Key missing. Check Streamlit Secrets.")
     st.stop()
 
-# --- SYSTEM INSTRUCTIONS ---
-#SYSTEM_INSTRUCTION = """
-#Role: You are an expert Chartered Accountant.
-#Context: Answer strictly based on the provided Income Tax Act 2025 and Memorandum.
-#Rules:
-#1. Use 'ICAI_Tabular_Mapping_2025.pdf' to map Old Sections to New Sections.
-#2. Quote the 'Income_Tax_Act_2025_Final.pdf' as the final authority.
-#"""
-
-# --- ENHANCED SYSTEM INSTRUCTIONS ---
+# --- ENHANCED SYSTEM INSTRUCTIONS (With Rule #4) ---
 SYSTEM_INSTRUCTION = """
 Role: You are an expert Chartered Accountant and Tax Research Assistant.
 
@@ -50,10 +45,10 @@ OPERATIONAL INSTRUCTIONS:
 4. FORMAT: Use bullet points for conditions to make it readable.
 """
 
-# --- FILE CONFIGURATION (Testing FULL Database) ---
+# --- FILE CONFIGURATION (With "Initializing" UI) ---
 @st.cache_resource
 def upload_knowledge_base():
-    # We uncomment ALL files to test if 'Flash' can handle them
+    # Loading ALL 9 files
     file_names = [
         "Income_Tax_Act_2025_Final.pdf",
         "ICAI_Tabular_Mapping_2025.pdf",
@@ -67,55 +62,83 @@ def upload_knowledge_base():
     ]
     
     uploaded_files = []
-    status_bar = st.progress(0, text="Loading Full Knowledge Base...")
     
-    for i, filename in enumerate(file_names):
-        try:
-            status_bar.progress((i + 1) / len(file_names), text=f"Processing: {filename}")
-            myfile = genai.upload_file(filename)
-            while myfile.state.name == "PROCESSING":
-                time.sleep(1)
-                myfile = genai.get_file(myfile.name)
-            uploaded_files.append(myfile)
-        except Exception as e:
-            st.warning(f"Skipped {filename}: {e}")
+    # UI: Show expanding status box while loading files
+    with st.status("🧪 Initializing Beta Knowledge Base...", expanded=True) as status:
+        for i, filename in enumerate(file_names):
+            status.write(f"Loading: {filename}...")
+            try:
+                myfile = genai.upload_file(filename)
+                # Wait for Google to process
+                while myfile.state.name == "PROCESSING":
+                    time.sleep(1)
+                    myfile = genai.get_file(myfile.name)
+                uploaded_files.append(myfile)
+            except Exception as e:
+                st.warning(f"Skipped {filename}: {e}")
+        status.update(label="✅ Beta Knowledge Base Ready!", state="complete", expanded=False)
             
-    status_bar.empty()
     return uploaded_files
 
-# --- MAIN APP ---
+# --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
+st.caption("Testing: Gemini 2.0 Flash • Streaming UI • Full Database")
 
+# 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = upload_knowledge_base()
-    st.success(f"✅ Loaded {len(st.session_state.knowledge_base)} documents!")
 
+# 2. Chat History
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I am the Beta Bot. I have read ALL files."}]
+    st.session_state.messages = [
+        {"role": "assistant", "content": "I am the Beta Bot. I have read ALL files and I am ready to test."}
+    ]
 
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
+# 3. Handle Input
 if prompt := st.chat_input("Ask about Rationale or Sections..."):
-    st.chat_message("user").write(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
 
-    try:
-        # TEST 1: Try 'gemini-1.5-flash' (Best for large context)
-        # If this fails, try 'gemini-1.5-pro-002'
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp", 
-            system_instruction=SYSTEM_INSTRUCTION
-        )
+    # --- THE INTERACTIVE UI LOGIC ---
+    with st.chat_message("assistant"):
         
-        chat = model.start_chat(history=[
-            {"role": "user", "parts": st.session_state.knowledge_base + ["System Ready."]},
-            {"role": "model", "parts": ["Understood."]}
-        ])
-        
-        response = chat.send_message(prompt)
-        st.chat_message("assistant").write(response.text)
-        st.session_state.messages.append({"role": "assistant", "content": response.text})
-        
-    except Exception as e:
-        st.error(f"Beta Test Failed: {e}")
+        # A. The "Thinking" Status Indicator
+        with st.status("🔍 Beta Bot is Thinking...", expanded=True) as status:
+            st.write("• Consulting Income Tax Act 2025...")
+            time.sleep(0.5) 
+            st.write("• Checking ICAI Mapping Table...")
+            time.sleep(0.5)
+            st.write("• Synthesizing Detailed Response...")
+            
+            try:
+                # Configure Model (Using the working 2.0 Flash Exp)
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.0-flash-exp", 
+                    system_instruction=SYSTEM_INSTRUCTION
+                )
+                
+                chat_session = model.start_chat(
+                    history=[
+                        {"role": "user", "parts": st.session_state.knowledge_base + ["System Ready."]},
+                        {"role": "model", "parts": ["Understood."]}
+                    ]
+                )
+                
+                # B. The "Stream" Request
+                response_stream = chat_session.send_message(prompt, stream=True)
+                
+                # Update status to complete
+                status.update(label="✅ Answer Found", state="complete", expanded=False)
+                
+                # C. The "Typewriter" Display
+                full_response = st.write_stream(response_stream)
+                
+                # Save to history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+            except Exception as e:
+                status.update(label="❌ Error", state="error")
+                st.error(f"Beta Test Failed: {e}")
