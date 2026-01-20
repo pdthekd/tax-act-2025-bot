@@ -12,18 +12,18 @@ st.set_page_config(
 )
 
 # --- VISUAL TWEAKS (CSS) ---
-# This makes the sidebar headers pop and cleans up the chat input
+# FIX: Removed the "background-color" line that broke Dark Mode.
+# We only keep the spacing tweaks now.
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] {
-        background-color: #f9f9fb;
-    }
     .stChatInput {
         position: fixed;
         bottom: 3rem;
+        z-index: 1000;
     }
     .block-container {
         padding-top: 2rem;
+        padding-bottom: 5rem; /* Space for the fixed chat input */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -85,7 +85,7 @@ def upload_knowledge_base():
                     st.error(f"Error: {filename}")
             status.update(label="✅ Ready", state="complete", expanded=False)
         
-        # Once done, we remove the big status box and just show a small indicator
+        # Once done, we remove the big status box
         time.sleep(2)
         status_placeholder.empty()
         
@@ -112,7 +112,7 @@ with st.sidebar:
             data=chat_text,
             file_name="tax_research_session.txt",
             mime="text/plain",
-            type="primary" # Makes the button stand out (filled color)
+            type="primary" 
         )
     
     # Clear Button
@@ -123,7 +123,6 @@ with st.sidebar:
     st.divider()
 
     # SECTION 2: LOW VALUE INFO (COLLAPSED AT BOTTOM)
-    # We hide the file list in an expander so it doesn't clutter the view
     with st.expander("📂 View Source Documents (9)"):
         st.caption(" The bot is currently reading these files:")
         st.text("1. Income_Tax_Act_2025_Final.pdf")
@@ -139,73 +138,4 @@ with st.sidebar:
 
 # --- MAIN APP LOGIC ---
 
-# 1. Initialize DB (Happens silently now)
-if "knowledge_base" not in st.session_state:
-    st.session_state.knowledge_base = upload_knowledge_base()
-
-# 2. Main Title
-st.title("Tax Act 2025 Research Assistant")
-st.markdown("Ask complex questions about sections, rates, and rationale.")
-
-# 3. Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I am ready. Ask me about TDS, Capital Gains, or Section mappings."}]
-
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-# 4. Handle Input
-if prompt := st.chat_input("Ex: What are the conditions for Section 194C?"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-
-    with st.chat_message("assistant"):
-        start_time = time.time()
-        
-        # Status Bubble
-        with st.status("🔍 Analyzing Documents...", expanded=True) as status:
-            st.write("• Consulting Income Tax Act 2025...")
-            time.sleep(0.2)
-            
-            try:
-                chat = client.chats.create(
-                    model="gemini-2.5-flash",
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION,
-                        temperature=0.3
-                    ),
-                    history=[
-                        types.Content(
-                            role="user",
-                            parts=[
-                                types.Part.from_uri(
-                                    file_uri=f.uri,
-                                    mime_type=f.mime_type
-                                ) for f in st.session_state.knowledge_base
-                            ] + [types.Part.from_text(text="System Ready.")]
-                        ),
-                        types.Content(
-                            role="model",
-                            parts=[types.Part.from_text(text="Understood.")]
-                        )
-                    ]
-                )
-
-                response_stream = chat.send_message_stream(prompt)
-                
-                def stream_parser(stream):
-                    for chunk in stream:
-                        if chunk.text:
-                            yield chunk.text
-
-                full_response = st.write_stream(stream_parser(response_stream))
-                
-                end_time = time.time()
-                elapsed_time = end_time - start_time
-                status.update(label=f"✅ Complete ({elapsed_time:.2f}s)", state="complete", expanded=False)
-                
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-            except Exception as e:
-                status.update(label="❌ Error", state="error")
-                st.error(f"Error: {e}")
+# 1. Initialize DB (Happens silently now
