@@ -3,7 +3,7 @@ import google.generativeai as genai
 import os
 import time
 
-# --- PAGE CONFIGURATION (Kept as Beta) ---
+# --- PAGE CONFIGURATION (Beta) ---
 st.set_page_config(
     page_title="Tax Act 2025 (BETA)",
     page_icon="🧪",
@@ -18,7 +18,7 @@ except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
     st.stop()
 
-# --- ENHANCED SYSTEM INSTRUCTIONS ---
+# --- SYSTEM INSTRUCTIONS ---
 SYSTEM_INSTRUCTION = """
 Role: You are an expert Chartered Accountant and Tax Research Assistant.
 
@@ -63,7 +63,6 @@ def upload_knowledge_base():
     
     uploaded_files = []
     
-    # UI: Show expanding status box while loading files
     with st.status("🧪 Initializing Beta Knowledge Base...", expanded=True) as status:
         for i, filename in enumerate(file_names):
             status.write(f"Loading: {filename}...")
@@ -80,8 +79,7 @@ def upload_knowledge_base():
             
     return uploaded_files
 
-# --- HELPER FUNCTION: CLEAN STREAM PARSER ---
-# This function fixes the "Junk Text" error by extracting only the text part
+# --- HELPER: CLEAN STREAM PARSER ---
 def stream_parser(stream):
     for chunk in stream:
         if chunk.text:
@@ -89,7 +87,7 @@ def stream_parser(stream):
 
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
-st.caption("Testing: Gemini 2.0 Flash • Streaming UI • Full Database")
+st.caption("Testing: Gemini 1.5 Flash • Streaming UI • Full Database")
 
 # 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
@@ -109,24 +107,21 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
-    # --- THE INTERACTIVE UI LOGIC ---
     with st.chat_message("assistant"):
-        
-        # A. Start Timer
         start_time = time.time()
         
-        # B. The "Thinking" Status Indicator
-        with st.status("🔍 Beta Bot is Thinking...", expanded=True) as status:
+        # A. Thinking Bubble
+        with st.status("🔍 Researching Tax Laws...", expanded=True) as status:
             st.write("• Consulting Income Tax Act 2025...")
             time.sleep(0.3) 
             st.write("• Checking ICAI Mapping Table...")
             time.sleep(0.3)
-            st.write("• Synthesizing Detailed Response...")
             
             try:
-                # Configure Model
+                # B. Configure Model (Using Standard Flash)
+                # We use the generic tag "gemini-1.5-flash" to avoid version errors
                 model = genai.GenerativeModel(
-                    model_name="gemini-2.0-flash-exp", 
+                    model_name="gemini-1.5-flash", 
                     system_instruction=SYSTEM_INSTRUCTION
                 )
                 
@@ -137,17 +132,16 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                     ]
                 )
                 
-                # C. The "Stream" Request
+                # C. Stream Request
                 response_stream = chat_session.send_message(prompt, stream=True)
                 
-                # D. The "Typewriter" Display (Using the Parser Fix)
-                # We use the helper function stream_parser() here
+                # D. Parse & Display
                 full_response = st.write_stream(stream_parser(response_stream))
                 
-                # E. End Timer & Show Stats
+                # E. Update Status
                 end_time = time.time()
                 elapsed_time = end_time - start_time
-                status.update(label=f"✅ Answer Found in {elapsed_time:.2f} seconds", state="complete", expanded=False)
+                status.update(label=f"✅ Answer Found in {elapsed_time:.2f}s", state="complete", expanded=False)
                 
                 # Save to history
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
