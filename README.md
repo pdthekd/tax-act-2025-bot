@@ -1,3 +1,5 @@
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]([https://tax-act-bot.streamlit.app/](https://tax-act-2025-bot-u79fppcyshdrz2a7sunrrm.streamlit.app/))
+
 # Tax Act 2025 Research Assistant ⚖️
 
 An AI-powered research tool designed to assist Chartered Accountants and tax professionals in navigating the Income Tax Act 2025. 
