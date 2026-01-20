@@ -126,9 +126,23 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                         {"role": "model", "parts": ["Understood."]}
                     ]
                 )
-                
+
                 # B. The "Stream" Request
                 response_stream = chat_session.send_message(prompt, stream=True)
+                
+                # Update status to complete
+                status.update(label="✅ Answer Found", state="complete", expanded=False)
+                
+                # C. The "Typewriter" Display (With Parsing Fix)
+                def stream_parser(stream):
+                    for chunk in stream:
+                        if chunk.text:
+                            yield chunk.text
+
+                full_response = st.write_stream(stream_parser(response_stream))
+                
+                # Save to history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
                 # Update status to complete
                 status.update(label="✅ Answer Found", state="complete", expanded=False)
