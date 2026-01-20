@@ -18,7 +18,7 @@ except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
     st.stop()
 
-# --- ENHANCED SYSTEM INSTRUCTIONS (With Rule #4) ---
+# --- ENHANCED SYSTEM INSTRUCTIONS ---
 SYSTEM_INSTRUCTION = """
 Role: You are an expert Chartered Accountant and Tax Research Assistant.
 
@@ -45,7 +45,7 @@ OPERATIONAL INSTRUCTIONS:
 4. FORMAT: Use bullet points for conditions to make it readable.
 """
 
-# --- FILE CONFIGURATION (With "Initializing" UI) ---
+# --- FILE CONFIGURATION ---
 @st.cache_resource
 def upload_knowledge_base():
     # Loading ALL 9 files
@@ -80,6 +80,13 @@ def upload_knowledge_base():
             
     return uploaded_files
 
+# --- HELPER FUNCTION: CLEAN STREAM PARSER ---
+# This function fixes the "Junk Text" error by extracting only the text part
+def stream_parser(stream):
+    for chunk in stream:
+        if chunk.text:
+            yield chunk.text
+
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
 st.caption("Testing: Gemini 2.0 Flash • Streaming UI • Full Database")
@@ -105,16 +112,19 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
     # --- THE INTERACTIVE UI LOGIC ---
     with st.chat_message("assistant"):
         
-        # A. The "Thinking" Status Indicator
+        # A. Start Timer
+        start_time = time.time()
+        
+        # B. The "Thinking" Status Indicator
         with st.status("🔍 Beta Bot is Thinking...", expanded=True) as status:
             st.write("• Consulting Income Tax Act 2025...")
-            time.sleep(0.5) 
+            time.sleep(0.3) 
             st.write("• Checking ICAI Mapping Table...")
-            time.sleep(0.5)
+            time.sleep(0.3)
             st.write("• Synthesizing Detailed Response...")
             
             try:
-                # Configure Model (Using the working 2.0 Flash Exp)
+                # Configure Model
                 model = genai.GenerativeModel(
                     model_name="gemini-2.0-flash-exp", 
                     system_instruction=SYSTEM_INSTRUCTION
@@ -126,29 +136,18 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                         {"role": "model", "parts": ["Understood."]}
                     ]
                 )
-
-                # B. The "Stream" Request
+                
+                # C. The "Stream" Request
                 response_stream = chat_session.send_message(prompt, stream=True)
                 
-                # Update status to complete
-                status.update(label="✅ Answer Found", state="complete", expanded=False)
-                
-                # C. The "Typewriter" Display (With Parsing Fix)
-                def stream_parser(stream):
-                    for chunk in stream:
-                        if chunk.text:
-                            yield chunk.text
-
+                # D. The "Typewriter" Display (Using the Parser Fix)
+                # We use the helper function stream_parser() here
                 full_response = st.write_stream(stream_parser(response_stream))
                 
-                # Save to history
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-                # Update status to complete
-                status.update(label="✅ Answer Found", state="complete", expanded=False)
-                
-                # C. The "Typewriter" Display
-                full_response = st.write_stream(response_stream)
+                # E. End Timer & Show Stats
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                status.update(label=f"✅ Answer Found in {elapsed_time:.2f} seconds", state="complete", expanded=False)
                 
                 # Save to history
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
