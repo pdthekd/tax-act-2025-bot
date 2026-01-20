@@ -13,7 +13,6 @@ st.set_page_config(
 
 # --- API SETUP (NEW SDK) ---
 try:
-    # Initialize the New GenAI Client
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
@@ -46,7 +45,7 @@ OPERATIONAL INSTRUCTIONS:
 4. FORMAT: Use bullet points for conditions to make it readable.
 """
 
-# --- FILE CONFIGURATION (NEW SDK) ---
+# --- FILE CONFIGURATION ---
 @st.cache_resource
 def upload_knowledge_base():
     # Loading ALL 9 files
@@ -64,15 +63,15 @@ def upload_knowledge_base():
     
     uploaded_files = []
     
-    with st.status("🧪 Initializing Knowledge Base (New GenAI SDK)...", expanded=True) as status:
+    with st.status("🧪 Initializing Knowledge Base...", expanded=True) as status:
         for i, filename in enumerate(file_names):
             status.write(f"Loading: {filename}...")
             try:
-                # 1. Upload using the new 'files.upload' method
+                # 1. Upload using the new SDK
                 with open(filename, "rb") as f:
                     myfile = client.files.upload(file=f, config={'display_name': filename})
                 
-                # 2. Wait for processing (New State Logic)
+                # 2. Wait for processing
                 while myfile.state.name == "PROCESSING":
                     time.sleep(1)
                     myfile = client.files.get(name=myfile.name)
@@ -87,7 +86,7 @@ def upload_knowledge_base():
 
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
-st.caption("Testing: Gemini 1.5 Flash • New Google GenAI SDK")
+st.caption("Testing: Gemini 1.5 Flash-002 • Specific Version")
 
 # 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
@@ -96,7 +95,7 @@ if "knowledge_base" not in st.session_state:
 # 2. Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "I am the Beta Bot (Upgraded). I have read ALL files."}
+        {"role": "assistant", "content": "I am ready. I am using the specific '002' model version."}
     ]
 
 for msg in st.session_state.messages:
@@ -110,23 +109,19 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
     with st.chat_message("assistant"):
         start_time = time.time()
         
-        # A. Thinking Bubble
         with st.status("🔍 Researching Tax Laws...", expanded=True) as status:
             st.write("• Consulting Income Tax Act 2025...")
             time.sleep(0.3)
-            st.write("• Checking ICAI Mapping Table...")
-            time.sleep(0.3)
             
             try:
-                # B. Create Chat
+                # B. Create Chat with SPECIFIC MODEL VERSION
                 chat = client.chats.create(
-                    model="gemini-1.5-flash",
+                    model="gemini-1.5-flash-002",
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
                         temperature=0.3
                     ),
                     history=[
-                        # Prime the history with files
                         types.Content(
                             role="user",
                             parts=[
@@ -143,9 +138,7 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
                     ]
                 )
 
-                # C. Stream Request (THE FIX IS HERE)
-                # Old SDK: chat.send_message(prompt, stream=True)
-                # New SDK: chat.send_message_stream(prompt)
+                # C. Stream Request
                 response_stream = chat.send_message_stream(prompt)
                 
                 # D. Parse & Display
@@ -156,14 +149,21 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
 
                 full_response = st.write_stream(stream_parser(response_stream))
                 
-                # E. Update Status
                 end_time = time.time()
                 elapsed_time = end_time - start_time
                 status.update(label=f"✅ Answer Found in {elapsed_time:.2f}s", state="complete", expanded=False)
                 
-                # Save to history
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
             except Exception as e:
                 status.update(label="❌ Error", state="error")
                 st.error(f"Beta Test Failed: {e}")
+                
+                # --- DIAGNOSTIC: IF FAILED, LIST AVAILABLE MODELS ---
+                st.write("---")
+                st.warning("🔍 Running Diagnostic to see what models you DO have access to:")
+                try:
+                    for m in client.models.list():
+                        st.code(m.name)
+                except:
+                    st.error("Could not list models.")
