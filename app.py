@@ -136,7 +136,7 @@ if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = upload_knowledge_base()
 
 st.title("Tax Act 2025 Research Assistant")
-st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️. All answers are cited from the Official Act.")
+st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "I am ready. Click the microphone to speak or type your question."}]
