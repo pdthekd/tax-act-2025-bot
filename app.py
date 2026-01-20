@@ -1,19 +1,20 @@
 import streamlit as st
-import google.generativeai as genai
-import os
+from google import genai
+from google.genai import types
 import time
+import os
 
-# --- PAGE CONFIGURATION (Beta) ---
+# --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Tax Act 2025 (BETA)",
     page_icon="🧪",
     layout="centered"
 )
 
-# --- API SETUP ---
+# --- API SETUP (NEW SDK) ---
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    # The new SDK uses a Client object instead of global configuration
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
     st.stop()
@@ -45,7 +46,7 @@ OPERATIONAL INSTRUCTIONS:
 4. FORMAT: Use bullet points for conditions to make it readable.
 """
 
-# --- FILE CONFIGURATION ---
+# --- FILE CONFIGURATION (NEW SDK) ---
 @st.cache_resource
 def upload_knowledge_base():
     # Loading ALL 9 files
@@ -63,31 +64,31 @@ def upload_knowledge_base():
     
     uploaded_files = []
     
-    with st.status("🧪 Initializing Beta Knowledge Base...", expanded=True) as status:
+    with st.status("🧪 Initializing Knowledge Base (New GenAI SDK)...", expanded=True) as status:
         for i, filename in enumerate(file_names):
             status.write(f"Loading: {filename}...")
             try:
-                myfile = genai.upload_file(filename)
-                # Wait for Google to process
+                # 1. Upload using the new 'files.upload' method
+                # Note: We must read the file in binary mode for the new SDK
+                with open(filename, "rb") as f:
+                    myfile = client.files.upload(file=f, config={'display_name': filename})
+                
+                # 2. Wait for processing (New State Logic)
                 while myfile.state.name == "PROCESSING":
                     time.sleep(1)
-                    myfile = genai.get_file(myfile.name)
+                    myfile = client.files.get(name=myfile.name)
+                
                 uploaded_files.append(myfile)
+                
             except Exception as e:
                 st.warning(f"Skipped {filename}: {e}")
-        status.update(label="✅ Beta Knowledge Base Ready!", state="complete", expanded=False)
+        status.update(label="✅ Knowledge Base Ready!", state="complete", expanded=False)
             
     return uploaded_files
 
-# --- HELPER: CLEAN STREAM PARSER ---
-def stream_parser(stream):
-    for chunk in stream:
-        if chunk.text:
-            yield chunk.text
-
 # --- MAIN APP UI ---
 st.title("🧪 Tax Bot (Beta Testing)")
-st.caption("Testing: Gemini 1.5 Flash-002 • Streaming UI • Full Database")
+st.caption("Testing: Gemini 1.5 Flash • New Google GenAI SDK")
 
 # 1. Initialize Knowledge Base
 if "knowledge_base" not in st.session_state:
@@ -96,7 +97,7 @@ if "knowledge_base" not in st.session_state:
 # 2. Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "I am the Beta Bot. I have read ALL files and I am ready to test."}
+        {"role": "assistant", "content": "I am the Beta Bot (Upgraded). I have read ALL files."}
     ]
 
 for msg in st.session_state.messages:
@@ -113,28 +114,47 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
         # A. Thinking Bubble
         with st.status("🔍 Researching Tax Laws...", expanded=True) as status:
             st.write("• Consulting Income Tax Act 2025...")
-            time.sleep(0.3) 
+            time.sleep(0.3)
             st.write("• Checking ICAI Mapping Table...")
             time.sleep(0.3)
             
             try:
-                # B. Configure Model (Using the Safe Production Flash)
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash-002", 
-                    system_instruction=SYSTEM_INSTRUCTION
-                )
-                
-                chat_session = model.start_chat(
+                # B. Create Chat (New SDK Syntax)
+                # We create a chat session, passing the system instructions in the config
+                chat = client.chats.create(
+                    model="gemini-1.5-flash",
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=0.3
+                    ),
                     history=[
-                        {"role": "user", "parts": st.session_state.knowledge_base + ["System Ready."]},
-                        {"role": "model", "parts": ["Understood."]}
+                        # We must prime the history with the files
+                        types.Content(
+                            role="user",
+                            parts=[
+                                types.Part.from_uri(
+                                    file_uri=f.uri,
+                                    mime_type=f.mime_type
+                                ) for f in st.session_state.knowledge_base
+                            ] + [types.Part.from_text(text="System Ready.")]
+                        ),
+                        types.Content(
+                            role="model",
+                            parts=[types.Part.from_text(text="Understood.")]
+                        )
                     ]
                 )
-                
+
                 # C. Stream Request
-                response_stream = chat_session.send_message(prompt, stream=True)
+                response_stream = chat.send_message(prompt, stream=True)
                 
-                # D. Parse & Display
+                # D. Parse & Display (New SDK returns clean text chunks directly)
+                # The new SDK's chunks are easier to handle
+                def stream_parser(stream):
+                    for chunk in stream:
+                        if chunk.text:
+                            yield chunk.text
+
                 full_response = st.write_stream(stream_parser(response_stream))
                 
                 # E. Update Status
