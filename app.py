@@ -7,22 +7,40 @@ import os
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Tax Act 2025 (BETA)",
-    page_icon="🧪",
+    page_icon="🎙️",
     layout="wide"
 )
 
 # --- VISUAL TWEAKS (CSS) ---
-# FIX: Removed the "background-color" rule so Dark Mode works correctly.
 st.markdown("""
 <style>
+    /* 1. Fixed Chat Input */
     .stChatInput {
         position: fixed;
         bottom: 3rem;
         z-index: 1000;
     }
+    
+    /* 2. Adjust Main Padding */
     .block-container {
         padding-top: 2rem;
-        padding-bottom: 5rem;
+        padding-bottom: 8rem; /* Extra space for the audio widget */
+    }
+
+    /* 3. MOBILE OPTIMIZATION */
+    @media (max-width: 768px) {
+        /* Remove huge margins on phone screens */
+        .block-container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            padding-top: 1rem !important;
+        }
+        /* Make chat input stick to bottom on mobile */
+        .stChatInput {
+            bottom: 0px !important;
+            padding-bottom: 20px !important;
+        }
+        /* Hide sidebar by default on mobile (optional, Streamlit handles this well) */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -47,12 +65,12 @@ OPERATIONAL INSTRUCTIONS:
 1. CITATION: Always cite the specific file name and section number.
 2. MAPPING: If the user asks about an Old Section, explicitly map it to the New Section.
 3. DEPTH: Do not summarize. List ALL conditions explicitly using bullet points.
+4. AUDIO INPUT: If the input is audio, transcribe the intent first, then answer strictly based on the documents.
 """
 
 # --- FILE CONFIGURATION ---
 @st.cache_resource
 def upload_knowledge_base():
-    # Loading ALL 9 files
     file_names = [
         "Income_Tax_Act_2025_Final.pdf",
         "ICAI_Tabular_Mapping_2025.pdf",
@@ -67,11 +85,8 @@ def upload_knowledge_base():
     
     uploaded_files = []
     
-    # Sidebar Loading UI
     with st.sidebar:
         status_placeholder = st.empty()
-        
-        # This block handles the loading animation
         with status_placeholder.status("📚 Initializing Library...", expanded=True) as status:
             for i, filename in enumerate(file_names):
                 status.write(f"Loading: {filename[:20]}...")
@@ -84,114 +99,129 @@ def upload_knowledge_base():
                     uploaded_files.append(myfile)
                 except Exception as e:
                     st.error(f"Error: {filename}")
-            
-            # This is the line that caused the error before. It is fixed now.
             status.update(label="✅ Ready", state="complete", expanded=False)
-        
-        # Remove the status box after 2 seconds
-        time.sleep(2)
+        time.sleep(1)
         status_placeholder.empty()
         
     return uploaded_files
 
 # --- SIDEBAR: ACTIONS ---
 with st.sidebar:
-    st.title("🧪 Beta Bot")
-    st.caption("Gemini 2.5 Flash • Testing Mode")
+    st.title("🎙️ Beta Bot")
+    st.caption("Gemini 2.5 Flash • Voice Enabled")
     st.divider()
 
     st.subheader("📝 Session Actions")
-    
-    # Export Button
     if "messages" in st.session_state:
         chat_text = "TAX RESEARCH LOG\n================\n\n"
         for msg in st.session_state.messages:
             role = "USER" if msg["role"] == "user" else "ASSISTANT"
             chat_text += f"[{role}]:\n{msg['content']}\n\n{'-'*40}\n\n"
-            
-        st.download_button(
-            label="📥 Download Research (.txt)",
-            data=chat_text,
-            file_name="tax_research_session.txt",
-            mime="text/plain",
-            type="primary"
-        )
+        st.download_button("📥 Download Log", chat_text, "tax_session.txt", "text/plain", type="primary")
     
-    # Clear Button
     if st.button("🔄 Start New Chat", use_container_width=True):
         st.session_state.messages = [{"role": "assistant", "content": "Conversation cleared. Ready for new queries."}]
         st.rerun()
 
     st.divider()
-
-    # File List (Collapsed)
-    with st.expander("📂 View Source Documents (9)"):
-        st.caption("The bot is reading these files:")
-        st.text("1. Income_Tax_Act_2025_Final.pdf")
-        st.text("2. ICAI_Tabular_Mapping_2025.pdf")
-        st.text("3. Memorandum_Part_1.pdf")
-        st.text("4. Memorandum_Part_2.pdf")
-        st.text("5. Memorandum_Part_3.pdf")
-        st.text("6. Memorandum_Part_4.pdf")
-        st.text("7. Suggestions_Review.pdf")
-        st.text("8. ICAI_Suggestions_Bill.pdf")
-        st.text("9. ICAI_Suggestions_Act.pdf")
-        st.success("✅ Active")
+    with st.expander("📂 Source Documents (9)"):
+        st.success("✅ System Online")
 
 # --- MAIN APP LOGIC ---
 
-# 1. Initialize DB
 if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = upload_knowledge_base()
 
-# 2. Title
-st.title("Tax Act 2025 Research Assistant (BETA)")
-st.markdown("Ask complex questions about sections, rates, and rationale.")
+st.title("Tax Act 2025 (Beta)")
+st.markdown("Try asking questions with **Voice** 🎙️ or **Text** ⌨️.")
 
-# 3. History
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I am the Beta Bot. I am ready."}]
+    st.session_state.messages = [{"role": "assistant", "content": "I am listening. Click the microphone to speak."}]
 
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    if msg["role"] == "user" and "Audio" in msg.get("type", ""):
+        st.chat_message("user").audio(msg["content"])
+    else:
+        st.chat_message(msg["role"]).write(msg["content"])
 
-# 4. Input & Response
-if prompt := st.chat_input("Ex: What are the conditions for Section 194C?"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
+# --- MULTIMODAL INPUT AREA ---
+# We create two columns: One for Text, One for Audio
+col1, col2 = st.columns([0.85, 0.15])
 
+with col1:
+    text_input = st.chat_input("Type your tax question here...")
+
+with col2:
+    # This is the new Native Audio Input widget
+    audio_input = st.audio_input("🎙️")
+
+# Determine which input to use
+user_prompt = None
+is_audio = False
+
+if audio_input:
+    user_prompt = audio_input
+    is_audio = True
+elif text_input:
+    user_prompt = text_input
+    is_audio = False
+
+# PROCESS INPUT
+if user_prompt:
+    
+    # 1. Display User Message
+    if is_audio:
+        # If audio, we show the audio player instead of text
+        st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "Audio"})
+        with st.chat_message("user"):
+            st.audio(user_prompt)
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.write(user_prompt)
+
+    # 2. Generate Answer
     with st.chat_message("assistant"):
         start_time = time.time()
         
-        with st.status("🔍 Analyzing Documents...", expanded=True) as status:
-            st.write("• Consulting Income Tax Act 2025...")
-            time.sleep(0.2)
-            
+        with st.status("🧠 Analyzing Input...", expanded=True) as status:
             try:
+                # Prepare Content for Gemini
+                user_content_parts = []
+                
+                # A. Add the Files (Context)
+                for f in st.session_state.knowledge_base:
+                    user_content_parts.append(
+                        types.Part.from_uri(file_uri=f.uri, mime_type=f.mime_type)
+                    )
+                
+                # B. Add the User Input (Text OR Audio)
+                if is_audio:
+                    # Convert audio buffer to bytes
+                    audio_bytes = user_prompt.getvalue()
+                    user_content_parts.append(
+                        types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
+                    )
+                    user_content_parts.append(
+                        types.Part.from_text(text="Listen to this question and answer it based on the provided Tax Act documents.")
+                    )
+                else:
+                    user_content_parts.append(
+                        types.Part.from_text(text=user_prompt)
+                    )
+
+                # C. Call Gemini 2.5 Flash
                 chat = client.chats.create(
                     model="gemini-2.5-flash",
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
                         temperature=0.3
                     ),
-                    history=[
-                        types.Content(
-                            role="user",
-                            parts=[
-                                types.Part.from_uri(
-                                    file_uri=f.uri,
-                                    mime_type=f.mime_type
-                                ) for f in st.session_state.knowledge_base
-                            ] + [types.Part.from_text(text="System Ready.")]
-                        ),
-                        types.Content(
-                            role="model",
-                            parts=[types.Part.from_text(text="Understood.")]
-                        )
-                    ]
+                    history=[] # We pass files in the message itself for cleaner multimodal handling
                 )
 
-                response_stream = chat.send_message_stream(prompt)
+                # D. Stream Response
+                response_stream = chat.send_message_stream(user_content_parts)
                 
                 def stream_parser(stream):
                     for chunk in stream:
