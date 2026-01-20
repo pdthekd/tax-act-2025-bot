@@ -77,7 +77,7 @@ if prompt := st.chat_input("Ask about Rationale or Sections..."):
         # TEST 1: Try 'gemini-1.5-flash' (Best for large context)
         # If this fails, try 'gemini-1.5-pro-002'
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-001", 
+            model_name="gemini-1.5-pro-002", 
             system_instruction=SYSTEM_INSTRUCTION
         )
         
