@@ -102,13 +102,17 @@ def upload_knowledge_base():
         
     return uploaded_files
 
-# --- SIDEBAR: ACTIONS ---
+# --- SIDEBAR: ACTIONS & DISCLAIMER ---
 with st.sidebar:
     st.title("⚖️ Tax Assistant")
-    st.caption("Gemini 2.5 Flash • Voice Enabled")
+    st.caption("Unofficial Research Tool • Gemini 2.5")
+    
+    # SAFETY SHIELD: Visible Disclaimer
+    st.warning("⚠️ **Disclaimer:** This AI tool is for educational research only. It is not affiliated with the ICAI. Verify all citations against the official Act.")
+    
     st.divider()
 
-    st.subheader("📝 Session Actions")
+    st.subheader("📝 Actions")
     if "messages" in st.session_state:
         chat_text = "TAX RESEARCH LOG\n================\n\n"
         for msg in st.session_state.messages:
@@ -132,7 +136,7 @@ if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = upload_knowledge_base()
 
 st.title("Tax Act 2025 Research Assistant")
-st.markdown("Try asking questions with **Voice** 🎙️ or **Text** ⌨️. All answers are cited from the Official Act.")
+st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️. All answers are cited from the Official Act.")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "I am ready. Click the microphone to speak or type your question."}]
