@@ -31,3 +31,5 @@ When ICAI releases new notifications:
 1.  Upload the new PDF to the GitHub repository.
 2.  Update the filename in `app.py`.
 3.  Reboot the application.
+
+🤝 Contribute: This project was built with the help of AI to solve a specific problem. I welcome other developers and CAs to fork this repo, add new features (like better prompts or more documents), and improve it!
