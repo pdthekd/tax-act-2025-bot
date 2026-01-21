@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import time
-import requests  # Required for the secure feedback form
+import requests  # For the secure feedback form
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -39,7 +39,6 @@ st.markdown("""
 # --- API SETUP ---
 try:
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-    # Retrieve the hidden email from secrets for the backend form
     SECURE_EMAIL = st.secrets.get("FEEDBACK_EMAIL", "your_email@example.com")
 except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
@@ -68,7 +67,6 @@ OPERATIONAL INSTRUCTIONS:
 VERIFICATION PROTOCOL (PERFORM BEFORE ANSWERING):
 - Did I quote a section from the 1961 Act? -> STOP. Find the 2025 equivalent.
 - Did I answer from memory? -> STOP. Check the provided PDF text.
-- Does my answer cite 'Income_Tax_Act_2025_Final.pdf'? -> If no, RETHINK.
 """
 
 # --- FILE CONFIGURATION ---
@@ -114,154 +112,118 @@ if "knowledge_base" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "I am ready. Ask me about any section (Old or New)."}]
 
-# --- SIDEBAR: STATIC ELEMENTS ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("⚖️ Tax Assistant")
     st.caption("Unofficial Tool • Gemini 2.5")
     st.warning("⚠️ **Disclaimer:** Educational research only. Verify citations.")
-    
     st.divider()
     
-    # 1. SECURE FEEDBACK FORM (Uses FormSubmit.co)
+    # Secure Feedback
     with st.expander("🐞 Report an Issue"):
         with st.form("feedback_form"):
             st.write("Send feedback anonymously.")
             user_msg = st.text_area("What went wrong?", placeholder="E.g., The bot cited the wrong section...")
-            
-            # Hidden context capture
-            last_context = "No history yet."
-            if len(st.session_state.messages) > 1:
-                last_context = str(st.session_state.messages[-2:])
-            
-            submit_feedback = st.form_submit_button("Send Report")
-            
-            if submit_feedback:
-                if not user_msg:
-                    st.error("Please write a message.")
-                else:
-                    # Secure POST request to FormSubmit
-                    try:
-                        resp = requests.post(
-                            f"https://formsubmit.co/{SECURE_EMAIL}",
-                            data={
-                                "message": user_msg,
-                                "context": last_context,
-                                "_subject": "Tax Bot Issue Report",
-                                "_captcha": "false"  # Disable captcha for smoother UX
-                            }
-                        )
-                        if resp.status_code == 200:
-                            st.success("Report Sent! Thank you.")
-                        else:
-                            st.error("Failed to send. Please try later.")
-                    except Exception as e:
-                        st.error(f"Error sending: {e}")
+            last_context = str(st.session_state.messages[-2:]) if len(st.session_state.messages) > 1 else "No history."
+            if st.form_submit_button("Send Report"):
+                try:
+                    requests.post(f"https://formsubmit.co/{SECURE_EMAIL}", data={"message": user_msg, "context": last_context, "_captcha": "false"})
+                    st.success("Sent!")
+                except:
+                    st.error("Error sending.")
 
     st.divider()
-
     if st.button("🔄 Start New Chat", use_container_width=True):
         st.session_state.messages = [{"role": "assistant", "content": "Conversation cleared. Ready."}]
         st.rerun()
 
     st.divider()
-    st.link_button("Official ICAI Updates", "https://icai.org/post/23274")
-    
     with st.expander("📂 Source Documents (9)"):
         st.success("✅ System Online")
 
-# --- MAIN CHAT LOGIC ---
+# --- MAIN CHAT ---
 st.title("Tax Act 2025 Research Assistant")
 st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️.")
 
-# Display History
 for msg in st.session_state.messages:
     if msg["role"] == "user" and "Audio" in msg.get("type", ""):
         st.chat_message("user").audio(msg["content"])
     else:
         st.chat_message(msg["role"]).write(msg["content"])
 
-# --- INPUT HANDLING ---
+# --- INPUT ---
 col1, col2 = st.columns([0.85, 0.15])
-with col1:
-    text_input = st.chat_input("Type your tax question here...")
-with col2:
-    audio_input = st.audio_input("🎙️")
+with col1: text_input = st.chat_input("Type question...")
+with col2: audio_input = st.audio_input("🎙️")
 
-user_prompt = None
-is_audio = False
+user_prompt = audio_input if audio_input else text_input
+is_audio = True if audio_input else False
 
-if audio_input:
-    user_prompt = audio_input
-    is_audio = True
-elif text_input:
-    user_prompt = text_input
-    is_audio = False
-
-# --- GENERATION LOGIC ---
 if user_prompt:
-    # 1. Show User Input
+    # 1. UI Update
     if is_audio:
         st.session_state.messages.append({"role": "user", "content": user_prompt, "type": "Audio"})
-        with st.chat_message("user"):
-            st.audio(user_prompt)
+        with st.chat_message("user"): st.audio(user_prompt)
     else:
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user"):
-            st.write(user_prompt)
+        with st.chat_message("user"): st.write(user_prompt)
 
-    # 2. Generate Answer
+    # 2. Logic
     with st.chat_message("assistant"):
         start_time = time.time()
-        with st.status("🧠 Converting Old Sections to New...", expanded=True) as status:
+        with st.status("🧠 Checking History & Documents...", expanded=True) as status:
             try:
-                user_content_parts = []
-                for f in st.session_state.knowledge_base:
-                    user_content_parts.append(types.Part.from_uri(file_uri=f.uri, mime_type=f.mime_type))
+                # --- MEMORY RECONSTRUCTION (THE FIX) ---
+                gemini_history = []
                 
-                if is_audio:
-                    user_content_parts.append(types.Part.from_bytes(data=user_prompt.getvalue(), mime_type="audio/wav"))
-                    user_content_parts.append(types.Part.from_text(text="Listen to this question. If it mentions an Old Section, MAP it to the 2025 Act using the Mapping Table, then answer using the 2025 Act."))
-                else:
-                    user_content_parts.append(types.Part.from_text(text=user_prompt))
+                # A. Add Files to History (Context Pinning)
+                file_parts = [types.Part.from_uri(file_uri=f.uri, mime_type=f.mime_type) for f in st.session_state.knowledge_base]
+                file_parts.append(types.Part.from_text(text="Reference these documents for all answers."))
+                gemini_history.append(types.Content(role="user", parts=file_parts))
+                gemini_history.append(types.Content(role="model", parts=[types.Part.from_text(text="Understood.")]))
+                
+                # B. Add Chat History (Text Only)
+                for msg in st.session_state.messages:
+                    if msg['role'] == "assistant" and "I am ready" in str(msg['content']): continue # Skip greeting
+                    
+                    # Convert to Gemini format
+                    role = "user" if msg['role'] == "user" else "model"
+                    
+                    # Only add TEXT messages to history to save bandwidth/tokens
+                    if isinstance(msg['content'], str):
+                         gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])]))
 
+                # --- CURRENT TURN SETUP ---
+                current_parts = []
+                if is_audio:
+                    current_parts.append(types.Part.from_bytes(data=user_prompt.getvalue(), mime_type="audio/wav"))
+                    current_parts.append(types.Part.from_text(text="Listen to this question. If it mentions an Old Section, MAP it first."))
+                else:
+                    current_parts.append(types.Part.from_text(text=user_prompt))
+
+                # --- GENERATE ---
                 chat = client.chats.create(
                     model="gemini-2.5-flash",
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_INSTRUCTION,
-                        temperature=0.3
-                    ),
-                    history=[] 
+                    config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.3),
+                    history=gemini_history # <--- MEMORY INJECTED HERE
                 )
 
-                response_stream = chat.send_message_stream(user_content_parts)
+                response_stream = chat.send_message_stream(current_parts)
+                full_response = st.write_stream((chunk.text for chunk in response_stream if chunk.text))
                 
-                def stream_parser(stream):
-                    for chunk in stream:
-                        if chunk.text:
-                            yield chunk.text
-
-                full_response = st.write_stream(stream_parser(response_stream))
-                end_time = time.time()
-                status.update(label=f"✅ Complete ({end_time - start_time:.2f}s)", state="complete", expanded=False)
-                
+                status.update(label=f"✅ Complete ({time.time() - start_time:.2f}s)", state="complete", expanded=False)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-                # FORCE RERUN TO UPDATE SIDEBAR
-                st.rerun() 
-                
+                st.rerun() # Refresh for Sidebar Download
+
             except Exception as e:
                 status.update(label="❌ Error", state="error")
                 st.error(f"Error: {e}")
 
-# --- UPDATE DOWNLOAD BUTTON (LOGIC AT THE END) ---
-# This block runs AFTER the new message is generated, ensuring the log is up to date.
-if "messages" in st.session_state and len(st.session_state.messages) > 1:
-    chat_text = "TAX RESEARCH LOG\n================\n\n"
+# --- DOWNLOAD LOGIC (After Rerun) ---
+if len(st.session_state.messages) > 1:
+    chat_text = "TAX LOG\n=======\n\n"
     for msg in st.session_state.messages:
-        content = msg['content']
-        if isinstance(content, bytes): content = "[Audio Data]"
-        chat_text += f"[{msg['role'].upper()}]:\n{content}\n\n{'-'*40}\n\n"
-    
-    # We use 'st.sidebar' here to inject the button back into the sidebar
+        content = "[Audio]" if isinstance(msg['content'], bytes) else msg['content']
+        chat_text += f"[{msg['role'].upper()}]:\n{content}\n\n"
     with st.sidebar:
-        st.download_button("📥 Download Log", chat_text, "tax_session.txt", "text/plain", type="primary")
+        st.download_button("📥 Download Log", chat_text, "tax_log.txt", "text/plain", type="primary")
