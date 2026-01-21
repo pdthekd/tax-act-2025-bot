@@ -2,7 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import time
-import urllib.parse  # Required for encoding email subjects/bodies
+import requests  # Required for the secure feedback form
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -36,9 +36,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- API & SECRETS SETUP ---
+# --- API SETUP ---
 try:
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    # Retrieve the hidden email from secrets for the backend form
+    SECURE_EMAIL = st.secrets.get("FEEDBACK_EMAIL", "your_email@example.com")
 except Exception:
     st.error("⚠️ API Key missing. Check Streamlit Secrets.")
     st.stop()
@@ -106,75 +108,57 @@ def upload_knowledge_base():
         
     return uploaded_files
 
-# --- HELPER: GENERATE SECURE EMAIL LINK ---
-def get_mailto_link(last_user_msg, last_bot_msg):
-    # Retrieve email from Secrets (Secure)
-    recipient = st.secrets.get("FEEDBACK_EMAIL", "fallback@example.com")
-    
-    subject = "Report: Tax Bot Issue"
-    
-    # Pre-fill body with context (Truncated to avoid URL limits)
-    body = f"""
-Hi Developer,
+# --- INIT STATE ---
+if "knowledge_base" not in st.session_state:
+    st.session_state.knowledge_base = upload_knowledge_base()
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "I am ready. Ask me about any section (Old or New)."}]
 
-I found an issue with the Tax Bot.
-
---- CONTEXT (Last Interaction) ---
-User Query: {last_user_msg[:200]}...
-Bot Response: {last_bot_msg[:300]}...
-
---- MY FEEDBACK ---
-(Please describe what is wrong here)
-
-"""
-    # Safe encoding for URL
-    safe_subject = urllib.parse.quote(subject)
-    safe_body = urllib.parse.quote(body)
-    return f"mailto:{recipient}?subject={safe_subject}&body={safe_body}"
-
-# --- SIDEBAR: ACTIONS & FEEDBACK ---
+# --- SIDEBAR: STATIC ELEMENTS ---
 with st.sidebar:
     st.title("⚖️ Tax Assistant")
-    st.caption("Unofficial Research Tool • Gemini 2.5")
-    
-    st.warning("⚠️ **Disclaimer:** This AI tool is for educational research only. Verify citations against the official Act.")
-    
-    st.divider()
-
-    st.subheader("🔧 Feedback & Support")
-    
-    # 1. Capture Context for Feedback
-    last_user = "N/A"
-    last_bot = "N/A"
-    if len(st.session_state.get("messages", [])) >= 2:
-        try:
-            # Try to grab the last text interaction
-            last_user = st.session_state.messages[-2]['content']
-            # If it was audio bytes, replace with label
-            if isinstance(last_user, bytes) or "type" in st.session_state.messages[-2]:
-                 last_user = "[Audio Message Sent]"
-            
-            last_bot = st.session_state.messages[-1]['content']
-        except:
-            pass
-            
-    # 2. Generate the Mailto Link
-    email_link = get_mailto_link(last_user, last_bot)
-    
-    # 3. The Button
-    st.link_button("🐞 Report a Bug / Issue", email_link, help="Opens your email client to send feedback directly to the developer.")
+    st.caption("Unofficial Tool • Gemini 2.5")
+    st.warning("⚠️ **Disclaimer:** Educational research only. Verify citations.")
     
     st.divider()
-
-    st.subheader("📝 Session")
-    if "messages" in st.session_state:
-        chat_text = "TAX RESEARCH LOG\n================\n\n"
-        for msg in st.session_state.messages:
-            content = msg['content']
-            if isinstance(content, bytes): content = "[Audio Data]"
-            chat_text += f"[{msg['role'].upper()}]:\n{content}\n\n{'-'*40}\n\n"
-        st.download_button("📥 Download Log", chat_text, "tax_session.txt", "text/plain", type="secondary")
     
+    # 1. SECURE FEEDBACK FORM (Uses FormSubmit.co)
+    with st.expander("🐞 Report an Issue"):
+        with st.form("feedback_form"):
+            st.write("Send feedback anonymously.")
+            user_msg = st.text_area("What went wrong?", placeholder="E.g., The bot cited the wrong section...")
+            
+            # Hidden context capture
+            last_context = "No history yet."
+            if len(st.session_state.messages) > 1:
+                last_context = str(st.session_state.messages[-2:])
+            
+            submit_feedback = st.form_submit_button("Send Report")
+            
+            if submit_feedback:
+                if not user_msg:
+                    st.error("Please write a message.")
+                else:
+                    # Secure POST request to FormSubmit
+                    try:
+                        resp = requests.post(
+                            f"https://formsubmit.co/{SECURE_EMAIL}",
+                            data={
+                                "message": user_msg,
+                                "context": last_context,
+                                "_subject": "Tax Bot Issue Report",
+                                "_captcha": "false"  # Disable captcha for smoother UX
+                            }
+                        )
+                        if resp.status_code == 200:
+                            st.success("Report Sent! Thank you.")
+                        else:
+                            st.error("Failed to send. Please try later.")
+                    except Exception as e:
+                        st.error(f"Error sending: {e}")
+
+    st.divider()
+
     if st.button("🔄 Start New Chat", use_container_width=True):
         st.session_state.messages = [{"role": "assistant", "content": "Conversation cleared. Ready."}]
         st.rerun()
@@ -185,24 +169,18 @@ with st.sidebar:
     with st.expander("📂 Source Documents (9)"):
         st.success("✅ System Online")
 
-# --- MAIN APP LOGIC ---
-
-if "knowledge_base" not in st.session_state:
-    st.session_state.knowledge_base = upload_knowledge_base()
-
+# --- MAIN CHAT LOGIC ---
 st.title("Tax Act 2025 Research Assistant")
-st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️. The bot prioritizes the **New 2025 Act**.")
+st.markdown("Ask questions with **Voice** 🎙️ or **Text** ⌨️.")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I am ready. Ask me about any section (Old or New)."}]
-
+# Display History
 for msg in st.session_state.messages:
     if msg["role"] == "user" and "Audio" in msg.get("type", ""):
         st.chat_message("user").audio(msg["content"])
     else:
         st.chat_message(msg["role"]).write(msg["content"])
 
-# --- MULTIMODAL INPUT ---
+# --- INPUT HANDLING ---
 col1, col2 = st.columns([0.85, 0.15])
 with col1:
     text_input = st.chat_input("Type your tax question here...")
@@ -219,6 +197,7 @@ elif text_input:
     user_prompt = text_input
     is_audio = False
 
+# --- GENERATION LOGIC ---
 if user_prompt:
     # 1. Show User Input
     if is_audio:
@@ -267,6 +246,22 @@ if user_prompt:
                 
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
+                # FORCE RERUN TO UPDATE SIDEBAR
+                st.rerun() 
+                
             except Exception as e:
                 status.update(label="❌ Error", state="error")
                 st.error(f"Error: {e}")
+
+# --- UPDATE DOWNLOAD BUTTON (LOGIC AT THE END) ---
+# This block runs AFTER the new message is generated, ensuring the log is up to date.
+if "messages" in st.session_state and len(st.session_state.messages) > 1:
+    chat_text = "TAX RESEARCH LOG\n================\n\n"
+    for msg in st.session_state.messages:
+        content = msg['content']
+        if isinstance(content, bytes): content = "[Audio Data]"
+        chat_text += f"[{msg['role'].upper()}]:\n{content}\n\n{'-'*40}\n\n"
+    
+    # We use 'st.sidebar' here to inject the button back into the sidebar
+    with st.sidebar:
+        st.download_button("📥 Download Log", chat_text, "tax_session.txt", "text/plain", type="primary")
